@@ -24,7 +24,7 @@ Date Work Commenced: 22/02/2023
 
 // YOU CAN ADD YOUR OWN FUNCTIONS, DECLARATIONS AND VARIABLES HERE
 
-
+FILE* fp = NULL;
 
 
 
@@ -39,15 +39,49 @@ Date Work Commenced: 22/02/2023
 // if everything goes well the function should return 1
 int InitLexer (char* file_name)
 {
-  return 0;
+  fp = fopen(file_name, 'r');
+  if(fp == NULL){
+    printf("File did not open correctly");
+    return 0;
+  }
+  
+  return 1;
 }
 
 
 // Get the next token from the source file
+// We want to eat the whitespace until we get to our first actual symbol
 Token GetNextToken ()
 {
+  // initialise a Token
 	Token t;
-  t.tp = ERR;
+
+  // get the first character of the file
+  int c = getc(fp);
+
+  // while the current character is whitespace, continue and consume the next character
+  while(isspace(c)){
+    // this will remove the next char from the file
+    c = getc(fp);
+  }
+
+  // if we come across what may be the start of a comment
+  if(c == '/'){
+
+    // we get the next character 
+    c = getc(fp);
+
+    // if it is a * it is the start of a comment
+    if(c == '*'){
+
+    }
+  }
+
+  if(c == EOF){
+    t.type = error;
+    strcpy(t.lexeme,"End Of File");
+  }
+  //t.type = error;
   return t;
 }
 
@@ -55,7 +89,7 @@ Token GetNextToken ()
 Token PeekNextToken ()
 {
   Token t;
-  t.tp = ERR;
+  t.type = error;
   return t;
 }
 
