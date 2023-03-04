@@ -71,17 +71,68 @@ Token GetNextToken ()
     // we get the next character 
     c = getc(fp);
 
-    // if it is a * it is the start of a comment
+    // if it is a * it is the start of a multi line comment
     if(c == '*'){
 
+      // to keep track of where the multi line comment ends, we will be looking for 
+      // the '/' and '*' symbols to be next to eachother, so we keep track of two connsecutive characters, until we see these two together
+      c = getc(fp);
+      nc = getc(fp);
+
+      while(c != '/' && nc !='*'){
+        c = getc(fp);
+        nc = getc(fp);
+      }
+
+    }
+
+    // two // means a single line comment, so consume characters until we see the new line symbol
+    if(c == '/'){
+      c = getc(fp);
+      while(c != '\n'){
+        c = getc(fp);
+      }
     }
   }
 
+  // if the end of file marker is detected, save that as a token
   if(c == EOF){
-    t.type = error;
+    t.type = eof;
     strcpy(t.lexeme,"End Of File");
+    return t;
   }
-  //t.type = error;
+
+  // setup a variable to hold the word
+  char lexeme[128];
+  int i = 0;
+
+  // if the character is alphabetic, then it is part of a keyword or string
+  if(isalpha(c)){
+
+    // keep looping until the word is found
+    while(isalpha(c)){
+      lexeme[i] = c;
+      c = getc(fp);
+      i++;
+    }
+
+    // now that we have the full word, we need to check whether it is a keyword or an identifier
+    bool inKW = false;
+
+    // here we loop through the keywords and if our word is in the keywords typdef
+    // then it must be a keyword, so we set it to be true and break the search
+    for(i = 0; i < sizeof(keywords); i++){
+      if(strcmp(lexeme, keywords[i]) == 0){ inKW = true; break; }
+    }
+
+    // if it is in keywords, we now know everything we need to about our token, so we can create it and return it
+    if(inKW){
+      t.type = keyword;
+      strcpy(t.lexeme,"Keyword");
+      return t;
+    }
+
+  } 
   return t;
 }
 
