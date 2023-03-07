@@ -19,12 +19,47 @@ Date Work Commenced: 22/02/2023
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "lexer.h"
+#include <stdbool.h>
 
 
 // YOU CAN ADD YOUR OWN FUNCTIONS, DECLARATIONS AND VARIABLES HERE
 
 FILE* fp = NULL;
+
+void commentRemover(){
+  // we get the next character 
+  int c = getc(fp);
+  // if it is a * it is the start of a multi line comment
+  if(c == '*'){
+
+    // to keep track of where the multi line comment ends, we will be looking for 
+    // the '/' and '*' symbols to be next to eachother, so we keep track of two connsecutive characters, until we see these two together
+    c = getc(fp);
+    int nc;
+    while(true){
+      c = getc(fp);
+      nc = getc(fp);
+      if(c == EOF || nc = EOF){ return 0;}
+      if((c == '*' && nc == '/') || (nc == '*' && c == '/')){
+        if(nc == '/'){
+          c = getc(fp);
+        }
+        break;
+      }
+      ungetc(nc, fp);
+    }
+
+  }
+
+  // two // means a single line comment, so consume characters until we see the new line symbol
+  else if(c == '/'){
+    c = getc(fp);
+    while(c != '\n'){
+      c = getc(fp);
+    }
+  } 
+}
+
 
 
 
@@ -39,7 +74,7 @@ FILE* fp = NULL;
 // if everything goes well the function should return 1
 int InitLexer (char* file_name)
 {
-  fp = fopen(file_name, 'r');
+  fp = fopen(file_name, "r");
   if(fp == NULL){
     printf("File did not open correctly");
     return 0;
@@ -55,44 +90,23 @@ Token GetNextToken ()
 {
   // initialise a Token
 	Token t;
+  strcpy(t.lexeme, "error");
+  t.type = error;
 
   // get the first character of the file
   int c = getc(fp);
 
+
   // while the current character is whitespace, continue and consume the next character
-  while(isspace(c)){
+  while(isspace(c) || c == '/'){
     // this will remove the next char from the file
-    c = getc(fp);
-  }
-
-  // if we come across what may be the start of a comment
-  if(c == '/'){
-
-    // we get the next character 
-    c = getc(fp);
-
-    // if it is a * it is the start of a multi line comment
-    if(c == '*'){
-
-      // to keep track of where the multi line comment ends, we will be looking for 
-      // the '/' and '*' symbols to be next to eachother, so we keep track of two connsecutive characters, until we see these two together
-      c = getc(fp);
-      nc = getc(fp);
-
-      while(c != '/' && nc !='*'){
-        c = getc(fp);
-        nc = getc(fp);
-      }
-
-    }
-
-    // two // means a single line comment, so consume characters until we see the new line symbol
     if(c == '/'){
       c = getc(fp);
-      while(c != '\n'){
-        c = getc(fp);
-      }
+      if(c == '/' || c == '*'){ ungetc(c, fp); commentRemover();}
+      else{ break; }
     }
+
+    c = getc(fp);
   }
 
   // if the end of file marker is detected, save that as a token
@@ -103,7 +117,7 @@ Token GetNextToken ()
   }
 
   // setup a variable to hold the word
-  char lexeme[128];
+  char lex[128] = "";
   int i = 0;
 
   // if the character is alphabetic, then it is part of a keyword or string
@@ -111,10 +125,11 @@ Token GetNextToken ()
 
     // keep looping until the word is found
     while(isalpha(c)){
-      lexeme[i] = c;
+      lex[i] = c;
       c = getc(fp);
       i++;
     }
+    ungetc(c,fp);
 
     // now that we have the full word, we need to check whether it is a keyword or an identifier
     bool inKW = false;
@@ -122,31 +137,74 @@ Token GetNextToken ()
     // here we loop through the keywords and if our word is in the keywords typdef
     // then it must be a keyword, so we set it to be true and break the search
     for(i = 0; i < sizeof(keywords); i++){
-      if(strcmp(lexeme, keywords[i]) == 0){ inKW = true; break; }
+      if(lex == keywords[i]){ inKW = true; break; }
     }
 
     // if it is in keywords, we now know everything we need to about our token, so we can create it and return it
     if(inKW){
       t.type = keyword;
-      strcpy(t.lexeme,"Keyword");
+      strcpy(t.lexeme,lex);
+      return t;
+    }
+    else{
+      t.type = identifier;
+      strcpy(t.lexeme, lex);
       return t;
     }
 
-  } 
+  }
+
+  if(isdigit(c)){
+    while(isdigit(c)){
+      lex[i] = c;
+      c = getc(fp);
+    }
+    ungetc(c,fp);
+
+    t.type = number;
+    strcpy(t.lexeme, lex);
+    return t;
+    
+  }
+
+
+  bool isSym = false;
+
+  for(i = 0; i < sizeof(symbols); i++){
+    if(c == symbols[i]){ isSym = true; break; }
+  }
+
+  if(!isSym){
+    t.type = error;
+    strcpy(t.lexeme, "Invalid Symbol");
+    printf("Invalid symbol is %c",c);
+    return t;
+  }
+  if(isSym){
+    lex[0] = c;
+    t.type = symbol;
+    strcpy(t.lexeme, lex);
+    return t;
+  }
+
   return t;
 }
 
 // peek (look) at the next token in the source file without removing it from the stream
 Token PeekNextToken ()
-{
-  Token t;
-  t.type = error;
+{ 
+  fpos_t position;
+  fgetpos(fp, &position);
+  Token t = GetNextToken();
+  fsetpos(fp, &position);
   return t;
+
 }
 
 // clean out at end, e.g. close files, free memory, ... etc
 int StopLexer ()
 {
+  fclose(fp);
 	return 0;
 }
 
@@ -156,8 +214,15 @@ int main ()
 {
 	// implement your main function here
   // NOTE: the autograder will not use your main function
+  InitLexer("test.txt");
+  Token x;
+  Token p;
+  x = GetNextToken();
+  p = PeekNextToken();
+  printf("string of peek is %s\n", p.lexeme);
+  x = GetNextToken();
+  printf("string of next get token is %s\n", x.lexeme);
 
-  
 	return 0;
 }
 // do not remove the next line

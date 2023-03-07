@@ -1,7 +1,9 @@
-typedef enum {keyword, identifier, symbols, eof, number, error} Tokentypes;
+typedef enum {keyword, identifier, symbol, eof, number, error} Tokentypes;
 
-const char* keywords[17] = {"class", "constructor", "static", "void", "method", "function", "field", "var", "int", "String", 
-                                "char", "boolean", "let", "if", "while", "do", "return"};
+const char* keywords[21] = {"class", "constructor", "static", "void", "method", "function", "field", "var", "int", "char",
+                                "boolean", "let", "if", "while", "do", "return", "true", "false", "else", "null", "this"};
+
+int symbols[19] = {'(', ')', '[', ']', '{', '}', ',', ';', '=', '.', '+', '-', '*', '/', '&', '|', '~', '<', '>'}; 
 
 
 typedef struct {
