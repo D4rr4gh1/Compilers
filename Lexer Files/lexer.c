@@ -20,13 +20,24 @@ Date Work Commenced: 22/02/2023
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include "lexer.h"
 
 
 // YOU CAN ADD YOUR OWN FUNCTIONS, DECLARATIONS AND VARIABLES HERE
 
+const char* keywords[21] = {"class", "constructor", "static", "void", "method", "function", "field", "var", "int", "char",
+                                "boolean", "let", "if", "while", "do", "return", "true", "false", "else", "null", "this"};
+
+int symbols[19] = {'(', ')', '[', ']', '{', '}', ',', ';', '=', '.', '+', '-', '*', '/', '&', '|', '~', '<', '>'}; 
+
+
 FILE* fp = NULL;
 
-void commentRemover(){
+char fName[32];
+
+int lineNum;
+
+int commentRemover(){
   // we get the next character 
   int c = getc(fp);
   // if it is a * it is the start of a multi line comment
@@ -39,28 +50,31 @@ void commentRemover(){
     while(true){
       c = getc(fp);
       nc = getc(fp);
-      if(c == EOF || nc = EOF){ return 0;}
+      if(c == EOF){ return 10;}
       if((c == '*' && nc == '/') || (nc == '*' && c == '/')){
         if(nc == '/'){
           c = getc(fp);
         }
         break;
       }
+      if(c == '\n') { lineNum ++; }
       ungetc(nc, fp);
     }
-
   }
 
   // two // means a single line comment, so consume characters until we see the new line symbol
-  else if(c == '/'){
+  if(c == '/'){
     c = getc(fp);
     while(c != '\n'){
       c = getc(fp);
+      if(c == EOF){return 10;}
     }
-  } 
+  }
+
+  if(c == '\n') { lineNum++;}
+  return 1;
+
 }
-
-
 
 
 
@@ -74,9 +88,11 @@ void commentRemover(){
 // if everything goes well the function should return 1
 int InitLexer (char* file_name)
 {
+  lineNum = 1;
   fp = fopen(file_name, "r");
+  strcpy(fName, file_name);
   if(fp == NULL){
-    printf("File did not open correctly");
+    printf("Error: File did not open correctly\n");
     return 0;
   }
   
@@ -90,41 +106,84 @@ Token GetNextToken ()
 {
   // initialise a Token
 	Token t;
-  strcpy(t.lexeme, "error");
-  t.type = error;
+  strcpy(t.fl, fName);
 
   // get the first character of the file
   int c = getc(fp);
 
 
   // while the current character is whitespace, continue and consume the next character
-  while(isspace(c) || c == '/'){
+  while(isspace(c) || c == '/' || c == '\n'){
     // this will remove the next char from the file
     if(c == '/'){
       c = getc(fp);
-      if(c == '/' || c == '*'){ ungetc(c, fp); commentRemover();}
-      else{ break; }
+      if(c == '/' || c == '*'){ 
+        ungetc(c, fp); 
+        if(commentRemover() == 10){
+          t.tp = ERR;
+          t.ec = EofInCom;
+          strcpy(t.lx, "Error: unexpected eof in comment");
+          t.ln = lineNum; 
+          return t;
+        };
+      }
+      else{ ungetc(c, fp); c = '/'; break; }
     }
+
+    if(c == '\n') { lineNum++; }
 
     c = getc(fp);
   }
 
   // if the end of file marker is detected, save that as a token
   if(c == EOF){
-    t.type = eof;
-    strcpy(t.lexeme,"End Of File");
+    t.tp = EOFile;
+    t.ln = lineNum;
+    strcpy(t.lx,"End Of File");
     return t;
   }
 
   // setup a variable to hold the word
-  char lex[128] = "";
+  char lex[256] = "";
   int i = 0;
 
-  // if the character is alphabetic, then it is part of a keyword or string
-  if(isalpha(c)){
+  // if the character is alphabetic, then it is part of a keyword or identifier
+
+  if(c == '"') { 
+    /* add to lex until next quotation found */
+    c = getc(fp);
+    while(c != '"'){
+      lex[i] = c;
+      i++;
+      c = getc(fp);
+
+      if(c == '\n'){
+        t.tp = ERR;
+        t.ec = NewLnInStr;
+        t.ln = lineNum;
+        strcpy(t.lx, "Error: new line in string constant");
+        return t;
+      }
+
+      if(c == EOF){
+        t.tp = ERR;
+        t.ec = EofInStr;
+        t.ln = lineNum;
+        strcpy(t.lx, "Error: unexpected eof in string constant");
+        return t;
+      }
+    }
+
+    t.tp = STRING;
+    t.ln = lineNum;
+    strcpy(t.lx, lex);
+    return t;
+  }
+
+  if(isalpha(c) || c == '_'){
 
     // keep looping until the word is found
-    while(isalpha(c)){
+    while(isalpha(c) || isdigit(c) || c == '_'){
       lex[i] = c;
       c = getc(fp);
       i++;
@@ -136,19 +195,24 @@ Token GetNextToken ()
 
     // here we loop through the keywords and if our word is in the keywords typdef
     // then it must be a keyword, so we set it to be true and break the search
-    for(i = 0; i < sizeof(keywords); i++){
-      if(lex == keywords[i]){ inKW = true; break; }
+    for(i = 0; i < 21; i++){
+      int value = strcmp(lex, keywords[i]);
+      if(value == 0){ inKW = true; break; }
     }
+
 
     // if it is in keywords, we now know everything we need to about our token, so we can create it and return it
     if(inKW){
-      t.type = keyword;
-      strcpy(t.lexeme,lex);
+      t.tp = RESWORD;
+      t.ln = lineNum;
+      strcpy(t.lx,lex);
       return t;
     }
+    // if it is not in keywords, it must be an ID, which can have underscores and digits, but not spaces
     else{
-      t.type = identifier;
-      strcpy(t.lexeme, lex);
+      t.tp = ID;
+      t.ln = lineNum;
+      strcpy(t.lx, lex);
       return t;
     }
 
@@ -158,32 +222,37 @@ Token GetNextToken ()
     while(isdigit(c)){
       lex[i] = c;
       c = getc(fp);
+      i++;
     }
     ungetc(c,fp);
 
-    t.type = number;
-    strcpy(t.lexeme, lex);
+    t.tp = INT;
+    t.ln = lineNum;
+    strcpy(t.lx, lex);
     return t;
     
   }
 
-
   bool isSym = false;
+
+  lex[0] = c;
 
   for(i = 0; i < sizeof(symbols); i++){
     if(c == symbols[i]){ isSym = true; break; }
   }
 
   if(!isSym){
-    t.type = error;
-    strcpy(t.lexeme, "Invalid Symbol");
-    printf("Invalid symbol is %c",c);
+    t.tp = ERR;
+    t.ec = IllSym;
+    t.ln = lineNum;
+    strcpy(t.lx, "Error: illegal symbol in source file");
     return t;
   }
   if(isSym){
     lex[0] = c;
-    t.type = symbol;
-    strcpy(t.lexeme, lex);
+    t.tp = SYMBOL;
+    t.ln = lineNum;
+    strcpy(t.lx, lex);
     return t;
   }
 
@@ -195,8 +264,10 @@ Token PeekNextToken ()
 { 
   fpos_t position;
   fgetpos(fp, &position);
+  int currentLn = lineNum;
   Token t = GetNextToken();
   fsetpos(fp, &position);
+  lineNum = currentLn;
   return t;
 
 }
@@ -215,13 +286,6 @@ int main ()
 	// implement your main function here
   // NOTE: the autograder will not use your main function
   InitLexer("test.txt");
-  Token x;
-  Token p;
-  x = GetNextToken();
-  p = PeekNextToken();
-  printf("string of peek is %s\n", p.lexeme);
-  x = GetNextToken();
-  printf("string of next get token is %s\n", x.lexeme);
 
 	return 0;
 }
