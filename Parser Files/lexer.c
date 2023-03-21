@@ -76,21 +76,6 @@ int commentRemover(){
 
 }
 
-bool symbolTest(int c){
-  for(int i = 0; i < sizeof(symbols); i++){
-    if(c == symbols[i]){ return true;}
-  }
-  if(isdigit(c) || isalpha(c) || c == '\n'|| c == '_') { return true; }
-  return false;
-}
-
-Token symbolError(Token t){
-  t.tp = ERR;
-  t.ec = IllSym;
-  t.ln = lineNum;
-  strcpy(t.lx, "Error: illegal symbol in source file");
-  return t;
-}
 
 
 // IMPLEMENT THE FOLLOWING functions
@@ -201,7 +186,6 @@ Token GetNextToken ()
     while(isalpha(c) || isdigit(c) || c == '_'){
       lex[i] = c;
       c = getc(fp);
-      if(!symbolTest(c)) { t = symbolError(t); return t; }
       i++;
     }
     ungetc(c,fp);
@@ -238,7 +222,6 @@ Token GetNextToken ()
     while(isdigit(c)){
       lex[i] = c;
       c = getc(fp);
-      if(!symbolTest(c)) { t = symbolError(t); return t; }
       i++;
     }
     ungetc(c,fp);
@@ -250,16 +233,28 @@ Token GetNextToken ()
     
   }
 
+  bool isSym = false;
+
   lex[0] = c;
 
-  if(symbolTest(c)){
+  for(i = 0; i < sizeof(symbols); i++){
+    if(c == symbols[i]){ isSym = true; break; }
+  }
+
+  if(!isSym){
+    t.tp = ERR;
+    t.ec = IllSym;
+    t.ln = lineNum;
+    strcpy(t.lx, "Error: illegal symbol in source file");
+    return t;
+  }
+  if(isSym){
     lex[0] = c;
     t.tp = SYMBOL;
     t.ln = lineNum;
     strcpy(t.lx, lex);
     return t;
   }
-  else{ t = symbolError(t);}
 
   return t;
 }
@@ -285,23 +280,14 @@ int StopLexer ()
 }
 
 // do not remove the next line
+#ifndef TEST
 int main ()
 {
 	// implement your main function here
   // NOTE: the autograder will not use your main function
   InitLexer("test.txt");
 
-  Token p;
-  p = GetNextToken();
-  while(p.tp != EOFile){
-    if(p.tp == ERR){
-      break;
-    }
-    p = GetNextToken();
-  }
-  printf("%s\n", p.lx);
-  printf("%d\n", p.ln);
-
 	return 0;
 }
 // do not remove the next line
+#endif
