@@ -280,14 +280,14 @@ int StopLexer ()
 }
 
 // do not remove the next line
-#ifndef TEST
-int main ()
-{
-	// implement your main function here
-  // NOTE: the autograder will not use your main function
-  InitLexer("test.txt");
+// #ifndef TEST
+// int main ()
+// {
+// 	// implement your main function here
+//   // NOTE: the autograder will not use your main function
+//   InitLexer("test.txt");
 
-	return 0;
-}
-// do not remove the next line
-#endif
+// 	return 0;
+// }
+// // do not remove the next line
+// #endif
